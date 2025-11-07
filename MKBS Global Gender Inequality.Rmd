@@ -4,3 +4,90 @@ author: "Muhammad Khalis"
 date: "`r Sys.Date()`"
 output: html_document
 ---
+
+The objective is to read the gender inequality data, get the difference between 
+the inequality index in 2010 and 2019 respectively, then join it with the spatial
+data of the world, and then visualise it! So here goes
+
+### Read the Gender Inequality Data and Global Map Data
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+library(sf)
+library(janitor)
+
+gender_ineq <- read_csv('hdr-data.csv')
+global_map <- st_read('World_Countries_(Generalized)_9029012925078512962.geojson')
+
+head(gender_ineq)
+head(global_map)
+```
+
+We can see that the Gender Inequality data is given as a long table.
+We can also anticipate immediate difficulties when joining the two data frames, 
+because the Gender Inequality data uses three-letter ISO codes but the Global
+Map data uses two-letter ISO codes.
+
+We address the first issue - cleaning Gender Inequality data.
+
+### Cleaning Gender Inequality Data 
+```{r message=FALSE, warning=FALSE}
+gender_ineq_diff <- gender_ineq %>%
+  pivot_wider(id_cols = 1:2,
+              names_from = year,
+              values_from = value) %>%
+  clean_names() %>%
+  mutate(diff = x2010 - x2019)
+
+head(gender_ineq_diff)
+```
+
+Now we turn to joining the non-spatial data to the spatial data. This can be 
+achieved by relying on the countrycode package, which should have been 
+installed using Console directly (thus it would not be featured in this 
+Markdown document)
+
+### Joining Non-spatial Data to Spatial Data
+```{r message=FALSE, warning=FALSE}
+library(countrycode)
+gender_ineq_diff <- gender_ineq_diff %>%
+  mutate(iso_2letter = countrycode(gender_ineq_diff$country_iso_code, 'iso3c', 'iso2c'))
+
+gender_ineq_map <- global_map %>%
+  left_join(.,
+            gender_ineq_diff,
+            by = c('ISO' = 'iso_2letter')) %>%
+  mutate(GII_2010 = x2010,
+         GII_2019 = x2019) %>%
+  select(c('COUNTRY', 'ISO', 'GII_2010', 'GII_2019', 'diff'))
+
+head(gender_ineq_map)
+```
+
+Now we can go ahead and map it!
+
+### Mapping Change in Gender Inequality between 2010 and 2019
+```{r message=FALSE, warning=FALSE}
+library(tmap)
+library(tmaptools)
+
+tmap_mode('view')
+
+tm_shape(gender_ineq_map) + 
+tm_polygons(fill="diff",
+            fill.scale= tm_scale_intervals(values="matplotlib.afmhot",
+                                           style="jenks"),
+            fill_alpha=0.5,
+            fill.legend = tm_legend(title = "Change in Index Rate", 
+                                    size = 0.8)) +
+tm_basemap(server = "OpenStreetMap") +
+tm_scalebar(position = c("left", "bottom"))+
+tm_title("Change in Gender Inequality Index from 2010 to 2019", 
+         size = 2,
+         position = c("center", "top"))
+```
+
+Of course this map shows the CHANGE in Gender Inequality. Just because a 
+country may have little change does not mean that it has not made a 
+commitment towards achieving gender equality (look at some of the Western 
+and Northern European countries). Click on the respective countries to find 
+out more details such as the GII in 2010 and 2019!
