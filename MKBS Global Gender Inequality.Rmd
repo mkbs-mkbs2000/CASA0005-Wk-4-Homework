@@ -1,0 +1,6 @@
+---
+title: "Global Gender Inequality 2010-2019"
+author: "Muhammad Khalis"
+date: "`r Sys.Date()`"
+output: html_document
+---
